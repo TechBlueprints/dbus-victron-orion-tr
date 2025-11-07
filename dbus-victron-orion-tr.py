@@ -533,13 +533,17 @@ class OrionTRScanner:
             logger.info(f"Configured device: {mac} (will initialize D-Bus after first advertisement)")
     
     def advertisement_callback(self, device: BLEDevice, advertisement_data: AdvertisementData):
-        """Called when a BLE advertisement is received"""
+        """Called when a BLE advertisement is received
         
-        # Check if this is a Victron device
+        This callback is invoked for ALL BLE advertisements, so we filter early
+        to minimize CPU usage for non-Victron devices.
+        """
+        
+        # Early-out filter: Check if this is a Victron device (manufacturer ID 0x02E1)
         if VICTRON_MANUFACTURER_ID not in advertisement_data.manufacturer_data:
             return
         
-        # Check if this is one of our configured devices
+        # Early-out filter: Check if this is one of our configured devices
         mac = device.address.lower()
         if mac not in self.devices:
             return
@@ -564,7 +568,8 @@ class OrionTRScanner:
         
         try:
             await scanner.start()
-            logger.info("BLE scanner started successfully")
+            logger.info("BLE scanner started successfully (passive continuous mode)")
+            logger.info(f"Filtering for Victron manufacturer ID: 0x{VICTRON_MANUFACTURER_ID:04X}")
             
             # Keep the scanner running - the callback handles advertisements as they arrive
             while True:
