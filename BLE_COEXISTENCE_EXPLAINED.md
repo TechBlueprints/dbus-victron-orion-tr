@@ -128,18 +128,58 @@ This is because:
 - BlueZ sees the scan is active and forwards advertisements via D-Bus
 - Our service receives them passively through D-Bus signals
 
+## Can Multiple Bleak Scanners Coexist?
+
+### Within Same Process: ❌ NO
+```python
+# This DOESN'T work - only scanner1 receives data
+scanner1 = BleakScanner(callback1)
+scanner2 = BleakScanner(callback2)
+await scanner1.start()
+await scanner2.start()  # scanner2 gets no data
+```
+
+**Why**: Bleak likely uses a singleton pattern for the BlueZ D-Bus connection within a process.
+
+### In Separate Processes: ✅ YES
+```bash
+# Process 1: dbus-victron-orion-tr (main service)
+python3 dbus-victron-orion-tr.py &
+
+# Process 2: test scanner
+python3 test_scanner.py &
+
+# Both receive advertisements!
+```
+
+**Verified**: Tested with main service + test scanner running simultaneously:
+- Main service: ✓ Continued receiving Orion-TR data
+- Test scanner: ✓ Received 114 advertisements in 15 seconds
+- Both processes: ✓ Detected same Victron devices
+
+**Why it works**: Each process gets its own D-Bus connection to BlueZ, and BlueZ broadcasts advertisement signals to all connected clients.
+
 ## Conclusion
 
 **Multiple BLE scanners CAN coexist when**:
-1. They use **different interfaces** (HCI socket vs D-Bus)
-2. They use **passive scanning** (listen-only mode)
-3. They don't try to **control scan parameters** exclusively
+1. They use **different interfaces** (HCI socket vs D-Bus) ✓
+2. They use **passive scanning** (listen-only mode) ✓
+3. They don't try to **control scan parameters** exclusively ✓
+4. They run in **separate processes** (for multiple Bleak scanners) ✓
 
 **Our implementation works because**:
 - We use Bleak's passive continuous scanning
 - We just listen to D-Bus advertisement signals
 - We don't compete with `dbus-ble-sensors` for HCI control
-- Both can read from the same advertisement stream simultaneously
+- Each process gets its own D-Bus connection
+- All can read from the same advertisement stream simultaneously
+
+**Coexistence Matrix**:
+| Scanner Type | dbus-ble-sensors | Bleak Process 1 | Bleak Process 2 |
+|--------------|------------------|-----------------|-----------------|
+| dbus-ble-sensors | ✓ | ✓ | ✓ |
+| Bleak Process 1 | ✓ | ✓ (same process: ❌) | ✓ |
+| Bleak Process 2 | ✓ | ✓ | ✓ |
 
 This is actually the **ideal architecture** for BLE monitoring on Linux!
 
