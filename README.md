@@ -72,17 +72,46 @@ INSTANCE = 2
 
 ```bash
 # Copy files to Cerbo GX
-rsync -avz dbus-victron-orion-tr/ root@cerbo:/data/dbus-victron-orion-tr/
+rsync -avz dbus-victron-orion-tr/ root@cerbo:/data/apps/dbus-victron-orion-tr/
 
 # SSH to Cerbo GX
 ssh root@cerbo
 
 # Make scripts executable
-cd /data/dbus-victron-orion-tr
+cd /data/apps/dbus-victron-orion-tr
 chmod +x start.sh stop.sh status.sh
 ```
 
-**Note:** This service runs without supervision for easy manual control.
+#### Option A: Manual Mode (No Supervision)
+
+For easy manual control and testing:
+
+```bash
+./start.sh   # Start service
+./stop.sh    # Stop service
+./status.sh  # Check status
+```
+
+#### Option B: Supervised Mode (Auto-start on Boot)
+
+For production use with automatic startup:
+
+```bash
+./install.sh
+```
+
+This will:
+- Install to `/data/apps/dbus-victron-orion-tr`
+- Set up daemontools supervision
+- Start automatically on boot
+
+Service management:
+```bash
+svc -u /service/dbus-victron-orion-tr  # Start
+svc -d /service/dbus-victron-orion-tr  # Stop
+svc -t /service/dbus-victron-orion-tr  # Restart
+svstat /service/dbus-victron-orion-tr  # Status
+```
 
 ### 4. Start and Verify
 

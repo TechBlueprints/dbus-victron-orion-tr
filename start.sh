@@ -1,7 +1,7 @@
 #!/bin/bash
 # Start the Orion-TR service manually
 
-cd /data/dbus-victron-orion-tr
+cd /data/apps/dbus-victron-orion-tr
 
 # Check if already running
 if pgrep -f dbus-victron-orion-tr.py > /dev/null; then
