@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+config.ini
+*.log
+
+# Test and analysis files
+test_*.py
+*_test.py
+analyze_*.py
+decode_*.py
+decrypt_*.py
+exhaustive_*.py
+explore_*.py
+find_*.py
+compare_*.py
+pair_*.py
+poll_*.py
+read_*.py
+scan_*.sh
+
