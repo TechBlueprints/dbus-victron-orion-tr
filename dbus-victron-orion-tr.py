@@ -562,17 +562,26 @@ class OrionTRScanner:
         logger.info("Starting continuous BLE scan...")
         scanner = BleakScanner(detection_callback=self.advertisement_callback)
         
-        while True:
+        try:
+            await scanner.start()
+            logger.info("BLE scanner started successfully")
+            
+            # Keep the scanner running - the callback handles advertisements as they arrive
+            while True:
+                await asyncio.sleep(60)  # Just keep alive, check every minute
+                
+        except BleakError as e:
+            logger.error(f"BLE scan error: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error during BLE scan: {e}")
+            raise
+        finally:
             try:
-                await scanner.start()
-                await asyncio.sleep(1)  # Scan for 1 second intervals
                 await scanner.stop()
-            except BleakError as e:
-                logger.error(f"BLE scan error: {e}. Retrying in 5 seconds...")
-                await asyncio.sleep(5)
-            except Exception as e:
-                logger.error(f"Unexpected error during BLE scan: {e}. Retrying in 5 seconds...")
-                await asyncio.sleep(5)
+                logger.info("BLE scanner stopped")
+            except:
+                pass
 
 
 def main():
