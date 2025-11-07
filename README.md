@@ -47,58 +47,73 @@ For each Orion-TR device you want to monitor:
 
 ### 2. Configure
 
-Edit `config.ini` and add your devices:
+Copy `config.default.ini` to `config.ini` and add your devices:
+
+```bash
+cp config.default.ini config.ini
+nano config.ini
+```
 
 ```ini
-# Device 1
-DEVICE_1_MAC="xx:xx:xx:xx:xx:xx"
-DEVICE_1_NAME="My Orion-TR"
-DEVICE_1_KEY="your_encryption_key_here"
-DEVICE_1_INSTANCE=1
+[DEVICE_1]
+MAC = xx:xx:xx:xx:xx:xx
+KEY = your_32_character_hex_encryption_key
+INSTANCE = 1
+
+[DEVICE_2]
+MAC = yy:yy:yy:yy:yy:yy
+KEY = another_32_character_hex_key
+INSTANCE = 2
 ```
+
+**Note:** Device names are automatically read from the Bluetooth device itself.
 
 ### 3. Install on Cerbo GX
 
 ```bash
 # Copy files to Cerbo GX
-scp -r dbus-victron-orion-tr root@cerbo:/data/tmp/
+rsync -avz dbus-victron-orion-tr/ root@cerbo:/data/dbus-victron-orion-tr/
 
 # SSH to Cerbo GX
 ssh root@cerbo
 
-# Run installation script
-cd /data/tmp/dbus-victron-orion-tr
-chmod +x install.sh
-./install.sh
+# Make scripts executable
+cd /data/dbus-victron-orion-tr
+chmod +x start.sh stop.sh status.sh
 ```
 
-### 4. Verify
+**Note:** This service runs without supervision for easy manual control.
+
+### 4. Start and Verify
 
 ```bash
-# Check service status
-svstat /service/dbus-victron-orion-tr
+# Start the service
+./start.sh
+
+# Check status
+./status.sh
 
 # View logs
-tail -f /data/apps/dbus-victron-orion-tr/service/log/current
+tail -f /var/log/dbus-victron-orion-tr.log
 
-# Check D-Bus (once implemented)
-dbus -y com.victronenergy.dcdc.orion_tr_1
+# Check D-Bus (example for device with MAC ef:c1:11:9d:a3:91)
+dbus -y com.victronenergy.dcdc.tr_2lfxwu69ht
 ```
 
 ## Service Management
 
 ```bash
 # Start service
-svc -u /service/dbus-victron-orion-tr
+./start.sh
 
 # Stop service
-svc -d /service/dbus-victron-orion-tr
-
-# Restart service
-svc -t /service/dbus-victron-orion-tr
+./stop.sh
 
 # Check status
-svstat /service/dbus-victron-orion-tr
+./status.sh
+
+# View live logs
+tail -f /var/log/dbus-victron-orion-tr.log
 ```
 
 ## Troubleshooting
@@ -107,10 +122,13 @@ svstat /service/dbus-victron-orion-tr
 
 ```bash
 # Check logs
-tail -100 /data/apps/dbus-victron-orion-tr/service/log/current
+tail -100 /var/log/dbus-victron-orion-tr.log
 
-# Check if Python dependencies are available
-python3 -c "import victron_ble; print('OK')"
+# Check if BLE scanner is available
+hciconfig hci0
+
+# Test BLE scanning
+bluetoothctl scan on
 ```
 
 ### No devices detected
@@ -124,12 +142,20 @@ python3 -c "import victron_ble; print('OK')"
 
 The encryption key changes when you change/reset the Bluetooth PIN. Get the current key from VictronConnect.
 
-## Architecture
+## How It Works
+
+1. **BLE Scanning**: Continuously scans for Victron BLE advertisements
+2. **Decryption**: Uses `victron_ble` library to decrypt Instant Readout data
+3. **Mode Detection**: Automatically detects if device is in DC-DC or Charger mode
+4. **D-Bus Publishing**: 
+   - Power Supply mode → `com.victronenergy.dcdc.tr_<mac>`
+   - Charger mode → `com.victronenergy.alternator.tr_<mac>`
+5. **UI Integration**: Appears in Venus OS device list and VRM portal
 
 ```
-Orion-TR (BLE) → BleakScanner → victron_ble decoder → D-Bus → Venus OS
+Orion-TR (BLE) → BleakScanner → victron_ble → Mode Detection → D-Bus → Venus OS UI
                                       ↑
-                              Encryption keys
+                              Encryption keys (config.ini)
 ```
 
 ## Dependencies
@@ -140,9 +166,11 @@ Orion-TR (BLE) → BleakScanner → victron_ble decoder → D-Bus → Venus OS
 
 ## Known Limitations
 
-1. **No current/power data**: Orion-TR Smart devices do not measure or transmit current. Only voltages are available.
+1. **No current/power data**: Orion-TR Smart devices do not measure or transmit current. Only voltages are available via BLE.
 2. **Bluetooth range**: Devices must be within Bluetooth range of the Cerbo GX (typically 10-30 feet/3-10 meters).
 3. **Encryption keys**: Must be obtained manually from VictronConnect for each device.
+4. **No remote control**: The Orion-TR cannot be controlled remotely via BLE (no on/off switch in UI).
+5. **BLE scanner conflicts**: May conflict with other BLE services on the Cerbo. Stop `dbus-ble-sensors` temporarily if needed.
 
 ## Development
 
@@ -151,28 +179,26 @@ Orion-TR (BLE) → BleakScanner → victron_ble decoder → D-Bus → Venus OS
 ```
 dbus-victron-orion-tr/
 ├── dbus-victron-orion-tr.py  # Main service
-├── config.ini                # Device configuration
-├── install.sh                # Installation script
-├── service/
-│   └── run                   # Daemontools run script
-└── ext/
+├── config.ini                # Device configuration (gitignored)
+├── config.default.ini        # Configuration template
+├── start.sh                  # Start service
+├── stop.sh                   # Stop service
+├── status.sh                 # Check service status
+├── install.sh                # Installation script (optional)
+└── ext/                      # Bundled dependencies
     ├── velib_python/         # Venus OS D-Bus library
-    └── bleak/                # BLE library (if not system-installed)
+    ├── victron_ble/          # Victron BLE protocol decoder
+    ├── bleak/                # BLE scanning library
+    └── Crypto/               # Cryptography library
 ```
 
-### Testing Locally
+### Key Features
 
-```bash
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install dependencies
-pip install victron_ble bleak
-
-# Run service (with Bluetooth enabled)
-python dbus-victron-orion-tr.py
-```
+- **Dynamic service type**: Automatically switches between `dcdc` and `alternator` based on device mode
+- **Fallback product names**: Includes names for devices not in victron_ble database
+- **Base36 MAC encoding**: Short, stable service names (e.g., `tr_2lfxwu69ht`)
+- **Dynamic instance assignment**: Checks for existing settings and finds available instances
+- **UI integration**: Appears in device list, VRM portal, and main overview
 
 ## References
 
