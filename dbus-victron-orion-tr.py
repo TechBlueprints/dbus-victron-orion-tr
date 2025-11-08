@@ -26,15 +26,15 @@ from gi.repository import GLib
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), 'ext'))
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), 'ext', 'velib_python'))
 
-from bleak import BleakScanner, BleakError
-from bleak.backends.device import BLEDevice
-from bleak.backends.scanner import AdvertisementData
 from victron_ble.devices import detect_device_type
 from victron_ble.exceptions import AdvertisementKeyMismatchError
 
 # Import velib_python for D-Bus
 from vedbus import VeDbusService
 from settingsdevice import SettingsDevice
+
+# Import pluggable BLE scanner
+from ble_scanner import create_scanner, BLEScanner
 
 # Set up D-Bus main loop
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
@@ -520,6 +520,7 @@ class OrionTRScanner:
     
     def __init__(self):
         self.devices: Dict[str, OrionTRDevice] = {}
+        self.ble_scanner: Optional[BLEScanner] = None
         
         # Initialize devices from configuration
         # Don't initialize D-Bus yet - wait for first advertisement to determine service type
@@ -532,61 +533,70 @@ class OrionTRScanner:
             self.devices[mac.lower()] = device
             logger.info(f"Configured device: {mac} (will initialize D-Bus after first advertisement)")
     
-    def advertisement_callback(self, device: BLEDevice, advertisement_data: AdvertisementData):
-        """Called when a BLE advertisement is received
-        
-        This callback is invoked for ALL BLE advertisements, so we filter early
-        to minimize CPU usage for non-Victron devices.
+    def advertisement_callback(self, mac: str, manufacturer_id: int, data: bytes, rssi: int, interface: str, name: str):
         """
+        Called when a BLE advertisement is received
         
-        # Early-out filter: Check if this is a Victron device (manufacturer ID 0x02E1)
-        if VICTRON_MANUFACTURER_ID not in advertisement_data.manufacturer_data:
+        This callback uses the standardized format from our pluggable scanner interface.
+        Args:
+            mac: MAC address (lowercase, with colons)
+            manufacturer_id: Manufacturer ID from advertisement
+            data: Raw manufacturer data bytes
+            rssi: Signal strength
+            interface: HCI interface (e.g., "hci0")
+            name: Device name (empty string if unknown)
+        """
+        # Filter for Victron manufacturer ID
+        if manufacturer_id != VICTRON_MANUFACTURER_ID:
             return
         
-        # Early-out filter: Check if this is one of our configured devices
-        mac = device.address.lower()
+        # Filter for our configured devices
+        mac = mac.lower()
         if mac not in self.devices:
             return
-        
-        # Get manufacturer data
-        mfg_data = advertisement_data.manufacturer_data[VICTRON_MANUFACTURER_ID]
         
         # Update device from advertisement
         orion_device = self.devices[mac]
         
-        # Update BLE name from the device (first time or if changed)
-        if device.name and device.name != orion_device.ble_name:
-            orion_device.ble_name = device.name
-            logger.info(f"Device {mac} identified as: {device.name}")
+        # Update BLE name if we got one from the advertisement
+        if name and name != orion_device.ble_name:
+            orion_device.ble_name = name
+            logger.info(f"Device {mac} identified as: {name}")
         
-        orion_device.update_from_advertisement(mfg_data)
+        orion_device.update_from_advertisement(data)
     
     async def scan_continuously(self):
-        """Continuously scan for BLE advertisements"""
-        logger.info("Starting continuous BLE scan...")
-        scanner = BleakScanner(detection_callback=self.advertisement_callback)
+        """Continuously scan for BLE advertisements using the best available scanner"""
+        logger.info("Initializing BLE scanner...")
         
         try:
-            await scanner.start()
-            logger.info("BLE scanner started successfully (passive continuous mode)")
-            logger.info(f"Filtering for Victron manufacturer ID: 0x{VICTRON_MANUFACTURER_ID:04X}")
+            # Create scanner with pluggable backend
+            # Prefer D-Bus scanner, fall back to Bleak
+            self.ble_scanner = create_scanner(
+                advertisement_callback=self.advertisement_callback,
+                service_name="orion-tr",
+                manufacturer_id=VICTRON_MANUFACTURER_ID,
+                mac_addresses=list(self.devices.keys()),
+                prefer_dbus=True
+            )
             
-            # Keep the scanner running - the callback handles advertisements as they arrive
+            await self.ble_scanner.start()
+            logger.info("BLE scanner started successfully")
+            
+            # Keep the scanner running
             while True:
-                await asyncio.sleep(60)  # Just keep alive, check every minute
+                await asyncio.sleep(60)  # Keep alive check every minute
                 
-        except BleakError as e:
+        except Exception as e:
             logger.error(f"BLE scan error: {e}")
             raise
-        except Exception as e:
-            logger.error(f"Unexpected error during BLE scan: {e}")
-            raise
         finally:
-            try:
-                await scanner.stop()
-                logger.info("BLE scanner stopped")
-            except:
-                pass
+            if self.ble_scanner:
+                try:
+                    await self.ble_scanner.stop()
+                    logger.info("BLE scanner stopped")
+                except:
+                    pass
 
 
 def main():
