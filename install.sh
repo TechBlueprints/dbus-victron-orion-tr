@@ -27,17 +27,47 @@ echo "Checking for dbus-ble-advertisements service..."
 if ! dbus-send --system --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames 2>/dev/null | grep -q "com.victronenergy.ble.advertisements"; then
     echo ""
     echo "=========================================="
-    echo "ERROR: dbus-ble-advertisements NOT FOUND"
+    echo "dbus-ble-advertisements NOT FOUND"
     echo "=========================================="
     echo ""
-    echo "This service requires the dbus-ble-advertisements router to be installed first."
+    echo "This service requires the dbus-ble-advertisements router."
     echo ""
-    echo "👉 Install it from: https://github.com/TechBlueprints/dbus-ble-advertisements"
-    echo ""
-    echo "Alternative: Use the legacy-standalone-bleak branch for standalone operation:"
-    echo "  https://github.com/TechBlueprints/dbus-victron-orion-tr/tree/legacy-standalone-bleak"
-    echo ""
-    exit 1
+    
+    # Check if we can auto-install
+    if command -v curl >/dev/null 2>&1; then
+        echo "Would you like to install it now? (y/n)"
+        read -r response
+        if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+            echo ""
+            echo "Installing dbus-ble-advertisements..."
+            curl -fsSL https://raw.githubusercontent.com/TechBlueprints/dbus-ble-advertisements/main/install.sh | bash
+            if [ $? -eq 0 ]; then
+                echo ""
+                echo "✓ dbus-ble-advertisements installed successfully"
+                echo ""
+            else
+                echo ""
+                echo "ERROR: Failed to install dbus-ble-advertisements"
+                echo "Please install manually from: https://github.com/TechBlueprints/dbus-ble-advertisements"
+                exit 1
+            fi
+        else
+            echo ""
+            echo "Installation cancelled. You must install dbus-ble-advertisements first:"
+            echo "  curl -fsSL https://raw.githubusercontent.com/TechBlueprints/dbus-ble-advertisements/main/install.sh | bash"
+            echo ""
+            echo "Or use the legacy-standalone-bleak branch:"
+            echo "  https://github.com/TechBlueprints/dbus-victron-orion-tr/tree/legacy-standalone-bleak"
+            exit 1
+        fi
+    else
+        echo "Manual installation required:"
+        echo "  wget -qO- https://raw.githubusercontent.com/TechBlueprints/dbus-ble-advertisements/main/install.sh | bash"
+        echo ""
+        echo "Or use the legacy-standalone-bleak branch:"
+        echo "  https://github.com/TechBlueprints/dbus-victron-orion-tr/tree/legacy-standalone-bleak"
+        exit 1
+    fi
 fi
 
 echo "✓ dbus-ble-advertisements service found"
