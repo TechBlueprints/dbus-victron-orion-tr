@@ -2,6 +2,8 @@
 
 Venus OS D-Bus service for Victron Orion-TR Smart DC-DC Converters via Bluetooth LE.
 
+> **📡 Requires `dbus-ble-advertisements` router service** - This version uses centralized BLE management. For standalone operation, see the `legacy-standalone-bleak` branch.
+
 This service scans for Victron Orion-TR Smart devices via Bluetooth, decrypts their Instant Readout advertisements, and publishes voltage and status information to D-Bus so they appear in the Venus OS dashboard.
 
 ## Features
