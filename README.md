@@ -2,6 +2,22 @@
 
 Venus OS D-Bus service for Victron Orion-TR Smart DC-DC Converters via Bluetooth LE.
 
+> ⚠️ **LEGACY BRANCH**: This is the `legacy-standalone-bleak` branch which uses Bleak for standalone BLE scanning. For the recommended approach using the centralized `dbus-ble-advertisements` router service, see the `main` branch.
+
+## Branch Information
+
+This branch is maintained for users who prefer a standalone installation without the `dbus-ble-advertisements` router service.
+
+**Tradeoffs:**
+- ✅ **Standalone**: No additional services required  
+- ✅ **Proven**: Uses the well-tested Bleak library
+- ❌ **Resource usage**: Runs its own BLE scanner (duplicated if multiple BLE services are used)
+- ❌ **Complexity**: Harder to debug BLE issues across multiple services
+
+**For most users, we recommend using the `main` branch** which integrates with `dbus-ble-advertisements` for centralized BLE management.
+
+---
+
 This service scans for Victron Orion-TR Smart devices via Bluetooth, decrypts their Instant Readout advertisements, and publishes voltage and status information to D-Bus so they appear in the Venus OS dashboard.
 
 ## Features
