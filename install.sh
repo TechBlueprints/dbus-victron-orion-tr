@@ -22,6 +22,27 @@ if [ ! -d "/data/apps" ]; then
     exit 1
 fi
 
+# Check if dbus-ble-advertisements is installed
+echo "Checking for dbus-ble-advertisements service..."
+if ! dbus-send --system --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames 2>/dev/null | grep -q "com.victronenergy.ble.advertisements"; then
+    echo ""
+    echo "=========================================="
+    echo "ERROR: dbus-ble-advertisements NOT FOUND"
+    echo "=========================================="
+    echo ""
+    echo "This service requires the dbus-ble-advertisements router to be installed first."
+    echo ""
+    echo "👉 Install it from: https://github.com/TechBlueprints/dbus-ble-advertisements"
+    echo ""
+    echo "Alternative: Use the legacy-standalone-bleak branch for standalone operation:"
+    echo "  https://github.com/TechBlueprints/dbus-victron-orion-tr/tree/legacy-standalone-bleak"
+    echo ""
+    exit 1
+fi
+
+echo "✓ dbus-ble-advertisements service found"
+echo ""
+
 # Create installation directory
 echo "Creating installation directory..."
 mkdir -p "$INSTALL_DIR"
@@ -43,6 +64,20 @@ mkdir -p "$INSTALL_DIR/service"
 cat > "$INSTALL_DIR/service/run" << 'EOF'
 #!/bin/sh
 exec 2>&1
+
+# Check if dbus-ble-advertisements service is available
+if ! dbus-send --system --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames | grep -q "com.victronenergy.ble.advertisements"; then
+    echo "ERROR: dbus-ble-advertisements service not found!"
+    echo "This service requires the dbus-ble-advertisements router to be installed and running."
+    echo "Please install it from: https://github.com/TechBlueprints/dbus-ble-advertisements"
+    echo ""
+    echo "Alternative: Use the legacy-standalone-bleak branch for standalone operation:"
+    echo "  https://github.com/TechBlueprints/dbus-victron-orion-tr/tree/legacy-standalone-bleak"
+    echo ""
+    sleep 30  # Wait before runit restarts to avoid rapid restart loop
+    exit 1
+fi
+
 cd /data/apps/dbus-victron-orion-tr
 exec python3 -u dbus-victron-orion-tr.py
 EOF

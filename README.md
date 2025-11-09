@@ -28,6 +28,18 @@ This service scans for Victron Orion-TR Smart devices via Bluetooth, decrypts th
 
 ## Requirements
 
+**⚠️ IMPORTANT: This service requires `dbus-ble-advertisements` to be installed first!**
+
+Before installing this service, you must install the `dbus-ble-advertisements` router service:
+
+👉 **[Install dbus-ble-advertisements first](https://github.com/TechBlueprints/dbus-ble-advertisements)**
+
+The router service provides centralized BLE management for all Victron BLE services. Without it, this service will not work.
+
+> **Alternative**: If you prefer standalone operation without the router, use the **[legacy-standalone-bleak](https://github.com/TechBlueprints/dbus-victron-orion-tr/tree/legacy-standalone-bleak)** branch instead.
+
+### Additional Requirements:
+
 - Venus OS (Cerbo GX, Venus GX, etc.)
 - Victron Orion-TR Smart with Bluetooth
 - VictronConnect app (to get encryption keys)
