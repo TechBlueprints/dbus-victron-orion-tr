@@ -7,7 +7,7 @@ decrypts their advertisement data, and publishes the values to D-Bus.
 
 Requirements:
 - victron_ble library (for decoding)
-- bleak library (for BLE scanning)
+- dbus-ble-advertisements router service (for BLE scanning)
 - velib_python (for D-Bus integration)
 """
 
@@ -566,18 +566,16 @@ class OrionTRScanner:
         orion_device.update_from_advertisement(data)
     
     async def scan_continuously(self):
-        """Continuously scan for BLE advertisements using the best available scanner"""
+        """Continuously scan for BLE advertisements using D-Bus router"""
         logger.info("Initializing BLE scanner...")
         
         try:
-            # Create scanner with pluggable backend
-            # Prefer D-Bus scanner, fall back to Bleak
+            # Create D-Bus scanner
             self.ble_scanner = create_scanner(
                 advertisement_callback=self.advertisement_callback,
                 service_name="orion-tr",
                 manufacturer_id=VICTRON_MANUFACTURER_ID,
-                mac_addresses=list(self.devices.keys()),
-                prefer_dbus=True
+                mac_addresses=list(self.devices.keys())
             )
             
             await self.ble_scanner.start()
