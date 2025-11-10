@@ -571,11 +571,11 @@ class OrionTRScanner:
         
         try:
             # Create D-Bus scanner
+            # Only register for manufacturer ID - router handles device filtering via UI toggles
             self.ble_scanner = create_scanner(
                 advertisement_callback=self.advertisement_callback,
                 service_name="orion-tr",
-                manufacturer_id=VICTRON_MANUFACTURER_ID,
-                mac_addresses=list(self.devices.keys())
+                manufacturer_id=VICTRON_MANUFACTURER_ID
             )
             
             await self.ble_scanner.start()

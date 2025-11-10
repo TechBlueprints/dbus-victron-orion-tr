@@ -56,7 +56,7 @@ class DBusAdvertisementScanner(BLEScanner):
         super().__init__(advertisement_callback)
         self.service_name = service_name.replace('-', '_')  # Sanitize for D-Bus paths
         self.manufacturer_ids = [manufacturer_id] if manufacturer_id else []
-        self.mac_addresses = [mac.lower().replace(':', '_') for mac in (mac_addresses or [])]
+        # MAC addresses are no longer used - router handles device filtering via UI toggles
         self.bus = None
         self.registration_objects = []
         self._signal_match = None
@@ -74,16 +74,15 @@ class DBusAdvertisementScanner(BLEScanner):
             proxy = bus.get_object('org.freedesktop.DBus', '/org/freedesktop/DBus')
             dbus_iface = dbus.Interface(proxy, 'org.freedesktop.DBus')
             
-            if 'com.victronenergy.ble.advertisements' not in dbus_iface.ListNames():
+            if 'com.victronenergy.switch.ble_router' not in dbus_iface.ListNames():
                 logger.info("dbus-ble-advertisements service not found on D-Bus")
                 return False
             
-            # Check service health
+            # Check service health by verifying the /ble_advertisements path exists
             try:
-                service = bus.get_object('com.victronenergy.ble.advertisements', '/ble_advertisements')
-                iface = dbus.Interface(service, 'com.victronenergy.ble.Advertisements')
-                version = iface.GetVersion()
-                logger.info(f"dbus-ble-advertisements service found (version: {version})")
+                service = bus.get_object('com.victronenergy.switch.ble_router', '/ble_advertisements')
+                # Just verify we can get the object - no need to call GetVersion
+                logger.info("dbus-ble-advertisements service found and healthy")
                 return True
             except Exception as e:
                 logger.warning(f"dbus-ble-advertisements service exists but unhealthy: {e}")
@@ -110,19 +109,15 @@ class DBusAdvertisementScanner(BLEScanner):
         self.bus = dbus.SystemBus()
         bus_name = dbus.service.BusName(f'com.victronenergy.{self.service_name}', self.bus)
         
-        # Register for manufacturer IDs
+        # Register for manufacturer IDs only
+        # The router will filter by enabled/disabled device toggles in the UI
         for mfg_id in self.manufacturer_ids:
             path = f'/ble_advertisements/{self.service_name}/mfgr/{mfg_id}'
             obj = dbus.service.Object(bus_name, path)
             self.registration_objects.append(obj)
             logger.info(f"  Registered interest in manufacturer ID: 0x{mfg_id:04X} at {path}")
         
-        # Register for specific MAC addresses
-        for mac in self.mac_addresses:
-            path = f'/ble_advertisements/{self.service_name}/addr/{mac}'
-            obj = dbus.service.Object(bus_name, path)
-            self.registration_objects.append(obj)
-            logger.info(f"  Registered interest in MAC: {mac} at {path}")
+        # No longer registering for specific MAC addresses - router handles device filtering
         
         # Subscribe to Advertisement signals on our paths
         # The router will emit signals on paths that match our registrations
@@ -130,7 +125,7 @@ class DBusAdvertisementScanner(BLEScanner):
             self._dbus_advertisement_callback,
             signal_name='Advertisement',
             dbus_interface='com.victronenergy.ble.Advertisements',
-            bus_name='com.victronenergy.ble.advertisements'
+            bus_name='com.victronenergy.switch.ble_router'
         )
         
         self.running = True
