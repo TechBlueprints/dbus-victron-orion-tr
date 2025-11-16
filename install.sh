@@ -105,8 +105,8 @@ RETRY_COUNT=0
 echo "Waiting for dbus-ble-advertisements service..."
 
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    # Check for advertisement emitter service
-    if dbus-send --system --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames 2>/dev/null | grep -q "com.victronenergy.ble.advertisements"; then
+    # Check for the router service
+    if dbus-send --system --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames 2>/dev/null | grep -q "com.victronenergy.switch.ble_router"; then
         echo "✓ Router service found after $RETRY_COUNT attempts"
         break
     fi
@@ -123,7 +123,7 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
 done
 
 # Final check
-if ! dbus-send --system --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames 2>/dev/null | grep -q "com.victronenergy.ble.advertisements"; then
+if ! dbus-send --system --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames 2>/dev/null | grep -q "com.victronenergy.switch.ble_router"; then
     echo ""
     echo "=========================================="
     echo "ERROR: dbus-ble-advertisements not found!"
