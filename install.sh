@@ -93,21 +93,55 @@ mkdir -p "$INSTALL_DIR/service"
 # Create run script
 cat > "$INSTALL_DIR/service/run" << 'EOF'
 #!/bin/sh
+echo "*** starting dbus-victron-orion-tr ***"
 exec 2>&1
+. /etc/profile.d/profile.sh
 
-# Check if dbus-ble-advertisements service is available
-if ! dbus-send --system --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames | grep -q "com.victronenergy.ble.advertisements"; then
-    echo "ERROR: dbus-ble-advertisements service not found!"
-    echo "This service requires the dbus-ble-advertisements router to be installed and running."
-    echo "Please install it from: https://github.com/TechBlueprints/dbus-ble-advertisements"
+# Wait for dbus-ble-advertisements service with retry logic
+MAX_RETRIES=30
+RETRY_DELAY=2
+RETRY_COUNT=0
+
+echo "Waiting for dbus-ble-advertisements service..."
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    # Check for advertisement emitter service
+    if dbus-send --system --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames 2>/dev/null | grep -q "com.victronenergy.ble.advertisements"; then
+        echo "✓ Router service found after $RETRY_COUNT attempts"
+        break
+    fi
+    
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    
+    if [ $RETRY_COUNT -eq 1 ]; then
+        echo "Waiting for dbus-ble-advertisements service to start..."
+    elif [ $RETRY_COUNT -eq 15 ]; then
+        echo "Still waiting... (${RETRY_COUNT}/${MAX_RETRIES} attempts)"
+    fi
+    
+    sleep $RETRY_DELAY
+done
+
+# Final check
+if ! dbus-send --system --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames 2>/dev/null | grep -q "com.victronenergy.ble.advertisements"; then
     echo ""
-    echo "Alternative: Use the legacy-standalone-bleak branch for standalone operation:"
+    echo "=========================================="
+    echo "ERROR: dbus-ble-advertisements not found!"
+    echo "=========================================="
+    echo ""
+    echo "This service requires the dbus-ble-advertisements router."
+    echo ""
+    echo "Please install it from:"
+    echo "  https://github.com/TechBlueprints/dbus-ble-advertisements"
+    echo ""
+    echo "Alternative: Use the legacy-standalone-bleak branch:"
     echo "  https://github.com/TechBlueprints/dbus-victron-orion-tr/tree/legacy-standalone-bleak"
     echo ""
-    sleep 30  # Wait before runit restarts to avoid rapid restart loop
+    sleep 10  # Brief pause before supervisor restarts
     exit 1
 fi
 
+echo "Starting orion-tr service..."
 cd /data/apps/dbus-victron-orion-tr
 exec python3 -u dbus-victron-orion-tr.py
 EOF
