@@ -114,6 +114,39 @@ EOF
 
 chmod +x "$INSTALL_DIR/service/run"
 
+# Add to rc.local to persist across reboots
+RC_LOCAL="/data/rc.local"
+RC_ENTRY="bash $INSTALL_DIR/install-reboot.sh > $INSTALL_DIR/startup.log 2>&1 &"
+SERVICE_LINK="/service/dbus-victron-orion-tr"
+
+if [ ! -f "$RC_LOCAL" ]; then
+    echo "Creating /data/rc.local..."
+    echo "#!/bin/bash" > "$RC_LOCAL"
+    chmod 755 "$RC_LOCAL"
+fi
+
+# Create a simple reboot script that just recreates the symlink
+cat > "$INSTALL_DIR/install-reboot.sh" << 'REBOOT_SCRIPT'
+#!/bin/bash
+# Recreate service symlink on reboot
+INSTALL_DIR="/data/apps/dbus-victron-orion-tr"
+SERVICE_LINK="/service/dbus-victron-orion-tr"
+
+if [ ! -L "$SERVICE_LINK" ]; then
+    ln -s "$INSTALL_DIR/service" "$SERVICE_LINK"
+fi
+REBOOT_SCRIPT
+
+chmod +x "$INSTALL_DIR/install-reboot.sh"
+
+if ! grep -qF "$RC_ENTRY" "$RC_LOCAL"; then
+    echo "Adding service to rc.local for persistence across reboots..."
+    echo "$RC_ENTRY" >> "$RC_LOCAL"
+    echo "✓ Added to rc.local"
+else
+    echo "✓ Already in rc.local"
+fi
+
 # Link to daemontools service directory
 echo "Registering service with daemontools..."
 if [ -L "/service/dbus-victron-orion-tr" ]; then
