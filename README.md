@@ -50,14 +50,8 @@ The router service provides centralized BLE management for all Victron BLE servi
 
 ### Recommended: One-Line Remote Install
 
-The easiest way to install (including dependencies):
-
 ```bash
-# Via curl (run directly on your Cerbo)
 ssh root@<cerbo-ip> "curl -fsSL https://raw.githubusercontent.com/TechBlueprints/dbus-victron-orion-tr/main/install.sh | bash"
-
-# Or via wget
-ssh root@<cerbo-ip> "wget -qO- https://raw.githubusercontent.com/TechBlueprints/dbus-victron-orion-tr/main/install.sh | bash"
 ```
 
 The installer will:
@@ -68,52 +62,6 @@ The installer will:
 - Check discovery status and warn if disabled
 
 ### Manual Installation
-
-```bash
-# SSH into your Cerbo
-ssh root@<cerbo-ip>
-
-# Install git (if not already installed)
-opkg install git
-
-# Install dbus-ble-advertisements first (required dependency)
-curl -fsSL https://raw.githubusercontent.com/TechBlueprints/dbus-ble-advertisements/main/install.sh | bash
-
-# Clone the Orion-TR repository
-cd /data/apps
-git clone https://github.com/TechBlueprints/dbus-victron-orion-tr.git
-
-# Run the service installer
-cd dbus-victron-orion-tr
-bash install-service.sh
-```
-
----
-
-## Installation
-
-### Recommended: One-Line Remote Install
-
-The easiest way to install (including dependencies) is via remote installer:
-
-```bash
-# Via curl (run directly on your Cerbo)
-ssh root@<cerbo-ip> "curl -fsSL https://raw.githubusercontent.com/TechBlueprints/dbus-victron-orion-tr/main/install.sh | bash"
-
-# Or via wget
-ssh root@<cerbo-ip> "wget -qO- https://raw.githubusercontent.com/TechBlueprints/dbus-victron-orion-tr/main/install.sh | bash"
-```
-
-The installer will:
-- Automatically install dbus-ble-advertisements (required dependency)
-- Install git if needed
-- Clone or update the repository
-- Install or restart the service
-- Check discovery status and warn if disabled
-
-### Manual Installation
-
-If you prefer to run the steps manually on your Cerbo:
 
 ```bash
 # SSH into your Cerbo
