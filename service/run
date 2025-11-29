@@ -3,7 +3,10 @@ echo "*** starting dbus-victron-orion-tr ***"
 exec 2>&1
 . /etc/profile.d/profile.sh
 
+# Note: Service starts immediately and handles router availability internally
+# If dbus-ble-advertisements is not available, BLE scanning will be disabled
+# but the service will continue to operate normally.
+
 echo "Starting orion-tr service..."
 cd /data/apps/dbus-victron-orion-tr
-exec python3 -u dbus-victron-orion-tr.py
-
+exec softlimit -d 100000000 -s 1000000 -a 100000000 python3 -u dbus-victron-orion-tr.py
