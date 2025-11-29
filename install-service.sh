@@ -106,7 +106,7 @@ echo "Waiting for dbus-ble-advertisements service..."
 
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     # Check for the router service
-    if dbus-send --system --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames 2>/dev/null | grep -q "com.victronenergy.switch.ble.advertisements"; then
+    if dbus-send --system --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames 2>/dev/null | grep -q "com.victronenergy.switch.bleadvertisements"; then
         echo "✓ Router service found after $RETRY_COUNT attempts"
         break
     fi

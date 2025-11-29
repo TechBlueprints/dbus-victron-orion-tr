@@ -74,13 +74,13 @@ class DBusAdvertisementScanner(BLEScanner):
             proxy = bus.get_object('org.freedesktop.DBus', '/org/freedesktop/DBus')
             dbus_iface = dbus.Interface(proxy, 'org.freedesktop.DBus')
             
-            if 'com.victronenergy.switch.ble_advertisements' not in dbus_iface.ListNames():
+            if 'com.victronenergy.switch.bleadvertisements' not in dbus_iface.ListNames():
                 logger.info("dbus-ble-advertisements service not found on D-Bus")
                 return False
             
             # Check service health by verifying the /ble_advertisements path exists
             try:
-                service = bus.get_object('com.victronenergy.switch.ble_advertisements', '/ble_advertisements')
+                service = bus.get_object('com.victronenergy.switch.bleadvertisements', '/ble_advertisements')
                 # Just verify we can get the object - no need to call GetVersion
                 logger.info("dbus-ble-advertisements service found and healthy")
                 return True
@@ -125,8 +125,8 @@ class DBusAdvertisementScanner(BLEScanner):
             self._signal_match = self.bus.add_signal_receiver(
                 self._dbus_advertisement_callback,
                 signal_name='Advertisement',
-                dbus_interface='com.techblueprints.ble.Advertisements',
-                bus_name='com.victronenergy.switch.ble_advertisements'
+                dbus_interface='com.victronenergy.switch.bleadvertisements',
+                bus_name='com.victronenergy.switch.bleadvertisements'
             )
             
             self.running = True
