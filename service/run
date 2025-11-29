@@ -1,0 +1,9 @@
+#!/bin/sh
+echo "*** starting dbus-victron-orion-tr ***"
+exec 2>&1
+. /etc/profile.d/profile.sh
+
+echo "Starting orion-tr service..."
+cd /data/apps/dbus-victron-orion-tr
+exec python3 -u dbus-victron-orion-tr.py
+
