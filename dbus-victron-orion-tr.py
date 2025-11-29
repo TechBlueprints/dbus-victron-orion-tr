@@ -42,6 +42,12 @@ dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 # Victron manufacturer ID
 VICTRON_MANUFACTURER_ID = 0x02E1
 
+# Orion Smart/XS DC-DC Converter product ID range
+# 0xA3C0-0xA3CF: Orion Smart DC-DC Converters
+# 0xA3D0-0xA3DF: Orion Smart Buck-Boost Converters (includes undocumented 48V models like 0xA3D5)
+ORION_PRODUCT_ID_MIN = 0xA3C0  # First Orion Smart DC-DC
+ORION_PRODUCT_ID_MAX = 0xA3DF  # Last Orion Smart Buck-Boost (includes undocumented models)
+
 # Load configuration
 def load_config():
     """Load device configuration from config.ini"""
@@ -571,11 +577,14 @@ class OrionTRScanner:
         
         try:
             # Create D-Bus scanner
-            # Only register for manufacturer ID - router handles device filtering via UI toggles
+            # Register for Victron manufacturer ID with Orion product ID range filter
+            # This ensures we only receive advertisements for Orion DC-DC converters,
+            # not all Victron devices (SmartShunts, SmartSolar, etc.)
             self.ble_scanner = create_scanner(
                 advertisement_callback=self.advertisement_callback,
-                service_name="orion-tr",
-                manufacturer_id=VICTRON_MANUFACTURER_ID
+                service_name="orion_tr",
+                manufacturer_id=VICTRON_MANUFACTURER_ID,
+                product_id_range=(ORION_PRODUCT_ID_MIN, ORION_PRODUCT_ID_MAX)
             )
             
             await self.ble_scanner.start()

@@ -52,10 +52,25 @@ class DBusAdvertisementScanner(BLEScanner):
     def __init__(self, advertisement_callback: Callable[[str, int, bytes, int, str, str], None],
                  service_name: str,
                  manufacturer_id: int = None,
-                 mac_addresses: list[str] = None):
+                 mac_addresses: list[str] = None,
+                 product_ids: list[int] = None,
+                 product_id_range: tuple[int, int] = None):
+        """
+        Initialize D-Bus advertisement scanner.
+        
+        Args:
+            advertisement_callback: Function to call when advertisement received
+            service_name: Service name for D-Bus registration
+            manufacturer_id: Manufacturer ID to filter (e.g., 0x02E1 for Victron)
+            mac_addresses: (deprecated) MAC addresses to filter
+            product_ids: List of specific product IDs to filter
+            product_id_range: Tuple of (min_pid, max_pid) for product ID range filtering
+        """
         super().__init__(advertisement_callback)
         self.service_name = service_name.replace('-', '_')  # Sanitize for D-Bus paths
         self.manufacturer_ids = [manufacturer_id] if manufacturer_id else []
+        self.product_ids = product_ids or []
+        self.product_id_range = product_id_range  # (min, max) tuple
         # MAC addresses are no longer used - router handles device filtering via UI toggles
         self.bus = None
         self.registration_objects = []
@@ -110,13 +125,28 @@ class DBusAdvertisementScanner(BLEScanner):
         try:
             bus_name = dbus.service.BusName(f'com.victronenergy.{self.service_name}', self.bus)
             
-            # Register for manufacturer IDs only
-            # The router will filter by enabled/disabled device toggles in the UI
+            # Register for manufacturer IDs with optional product ID filtering
             for mfg_id in self.manufacturer_ids:
-                path = f'/ble_advertisements/{self.service_name}/mfgr/{mfg_id}'
-                obj = dbus.service.Object(bus_name, path)
-                self.registration_objects.append(obj)
-                logger.info(f"  Registered interest in manufacturer ID: 0x{mfg_id:04X} at {path}")
+                # If product ID range is specified, register for the range
+                if self.product_id_range:
+                    min_pid, max_pid = self.product_id_range
+                    path = f'/ble_advertisements/{self.service_name}/mfgr/{mfg_id}/pid_range/{min_pid}_{max_pid}'
+                    obj = dbus.service.Object(bus_name, path)
+                    self.registration_objects.append(obj)
+                    logger.info(f"  Registered interest in mfg 0x{mfg_id:04X} with pid_range {min_pid}-{max_pid} (0x{min_pid:04X}-0x{max_pid:04X}) at {path}")
+                # If specific product IDs are specified, register for each
+                elif self.product_ids:
+                    for pid in self.product_ids:
+                        path = f'/ble_advertisements/{self.service_name}/mfgr/{mfg_id}/pid/{pid}'
+                        obj = dbus.service.Object(bus_name, path)
+                        self.registration_objects.append(obj)
+                        logger.info(f"  Registered interest in mfg 0x{mfg_id:04X} pid 0x{pid:04X} at {path}")
+                # Otherwise, register for all devices from this manufacturer
+                else:
+                    path = f'/ble_advertisements/{self.service_name}/mfgr/{mfg_id}'
+                    obj = dbus.service.Object(bus_name, path)
+                    self.registration_objects.append(obj)
+                    logger.info(f"  Registered interest in manufacturer ID: 0x{mfg_id:04X} at {path}")
             
             # No longer registering for specific MAC addresses - router handles device filtering
             
@@ -176,12 +206,22 @@ def create_scanner(advertisement_callback: Callable,
                    service_name: str,
                    manufacturer_id: int = None,
                    mac_addresses: list[str] = None,
+                   product_ids: list[int] = None,
+                   product_id_range: tuple[int, int] = None,
                    **kwargs) -> BLEScanner:
     """
     Create the appropriate BLE scanner based on what's available.
     
     This version only supports dbus-ble-advertisements router.
     For standalone operation, see the legacy-standalone-bleak branch.
+    
+    Args:
+        advertisement_callback: Function to call when advertisement received
+        service_name: Service name for D-Bus registration
+        manufacturer_id: Manufacturer ID to filter (e.g., 0x02E1 for Victron)
+        mac_addresses: (deprecated) MAC addresses to filter
+        product_ids: List of specific product IDs to filter
+        product_id_range: Tuple of (min_pid, max_pid) for product ID range filtering
     
     Returns a scanner that will attempt to connect to the router.
     If router is not available, scanner will be in disabled state but service continues.
@@ -192,5 +232,7 @@ def create_scanner(advertisement_callback: Callable,
         advertisement_callback=advertisement_callback,
         service_name=service_name,
         manufacturer_id=manufacturer_id,
-        mac_addresses=mac_addresses
+        mac_addresses=mac_addresses,
+        product_ids=product_ids,
+        product_id_range=product_id_range
     )
