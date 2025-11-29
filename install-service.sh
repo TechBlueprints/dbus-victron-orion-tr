@@ -24,7 +24,7 @@ fi
 
 # Check if dbus-ble-advertisements is installed
 echo "Checking for dbus-ble-advertisements service..."
-if ! dbus-send --system --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames 2>/dev/null | grep -q "com.victronenergy.switch.ble.advertisements"; then
+if ! dbus-send --system --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames 2>/dev/null | grep -q "com.victronenergy.ble_advertisements"; then
     echo ""
     echo "=========================================="
     echo "dbus-ble-advertisements NOT FOUND"
@@ -123,7 +123,7 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
 done
 
 # Final check
-if ! dbus-send --system --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames 2>/dev/null | grep -q "com.victronenergy.switch.ble.advertisements"; then
+if ! dbus-send --system --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames 2>/dev/null | grep -q "com.victronenergy.ble_advertisements"; then
     echo ""
     echo "=========================================="
     echo "ERROR: dbus-ble-advertisements not found!"
