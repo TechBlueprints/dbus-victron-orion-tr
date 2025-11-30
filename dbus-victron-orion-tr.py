@@ -31,7 +31,6 @@ from victron_ble.exceptions import AdvertisementKeyMismatchError
 
 # Import velib_python for D-Bus
 from vedbus import VeDbusService
-from settingsdevice import SettingsDevice
 
 # Import pluggable BLE scanner
 from ble_scanner import create_scanner, BLEScanner
@@ -151,10 +150,14 @@ class OrionTRDevice:
         
         # D-Bus service
         self.dbus_service: Optional[VeDbusService] = None
-        self.settings_device: Optional[SettingsDevice] = None
         
         # Service type determination (set after first advertisement)
         self.service_type: Optional[str] = None  # 'dcdc' or 'alternator'
+        
+        # Logging throttle - only log on changes or every 10 minutes
+        self._last_log_time: Optional[datetime] = None
+        self._last_logged_state: Optional[str] = None
+        self._log_interval = timedelta(minutes=10)
         
     @property
     def name(self) -> str:
@@ -191,83 +194,6 @@ class OrionTRDevice:
             # Default to dcdc for POWER_SUPPLY, OFF, and EXTERNAL_CONTROL
             return 'dcdc'
     
-    def _get_device_instance(self, service_type: str):
-        """Get device instance, checking settings first or finding an available one
-        
-        Args:
-            service_type: Either 'dcdc' or 'alternator'
-        """
-        # Generate unique ID for this device
-        mac_hex = self.mac.replace(':', '')
-        mac_int = int(mac_hex, 16)
-        mac_b36 = self._to_base36(mac_int)
-        unique_id = f"tr_{mac_b36}"
-        settings_path = f"/Settings/Devices/{unique_id}/ClassAndVrmInstance"
-        
-        try:
-            # Check if this device already has a saved instance in settings
-            bus = dbus.SystemBus()
-            obj = bus.get_object('com.victronenergy.settings', settings_path)
-            iface = dbus.Interface(obj, 'com.victronenergy.BusItem')
-            value = iface.GetValue()
-            
-            # Parse "dcdc:X" or "alternator:X" format
-            if value and ':' in value:
-                parts = value.split(':')
-                if len(parts) == 2 and parts[0] == service_type:
-                    instance = int(parts[1])
-                    logger.info(f"{self.mac}: Found existing {service_type} instance {instance} in settings")
-                    return instance
-                elif len(parts) == 2:
-                    # Settings exist but for different service type - will be cleaned up
-                    logger.info(f"{self.mac}: Found settings for {parts[0]}, but need {service_type} - will reassign")
-        except Exception as e:
-            logger.debug(f"{self.mac}: No existing settings found: {e}")
-        
-        # No existing settings, check if configured instance is available
-        try:
-            bus = dbus.SystemBus()
-            settings = bus.get_object('com.victronenergy.settings', '/Settings')
-            iface = dbus.Interface(settings, 'com.victronenergy.BusItem')
-            
-            # Get all device instances currently in use for this service type
-            used_instances = set()
-            devices_obj = bus.get_object('com.victronenergy.settings', '/Settings/Devices')
-            devices_iface = dbus.Interface(devices_obj, 'com.victronenergy.BusItem')
-            devices = devices_iface.GetValue()
-            
-            for device_path in devices:
-                if device_path.endswith('/ClassAndVrmInstance'):
-                    try:
-                        obj = bus.get_object('com.victronenergy.settings', f'/Settings/Devices/{device_path}')
-                        iface = dbus.Interface(obj, 'com.victronenergy.BusItem')
-                        value = iface.GetValue()
-                        if value and ':' in value:
-                            parts = value.split(':')
-                            if len(parts) == 2 and parts[0] == service_type:
-                                used_instances.add(int(parts[1]))
-                    except:
-                        pass
-            
-            # Check if our configured instance is free
-            if self.dbus_instance not in used_instances:
-                logger.info(f"{self.mac}: Using configured {service_type} instance {self.dbus_instance}")
-                return self.dbus_instance
-            
-            # Find first available instance starting from configured value
-            for instance in range(self.dbus_instance, 300):
-                if instance not in used_instances:
-                    logger.info(f"{self.mac}: Configured instance {self.dbus_instance} in use, using {instance}")
-                    return instance
-                    
-        except Exception as e:
-            logger.warning(f"{self.mac}: Error checking device instances: {e}, using configured instance {self.dbus_instance}")
-            return self.dbus_instance
-        
-        # Fallback to configured instance
-        logger.warning(f"{self.mac}: Could not find free instance, using configured {self.dbus_instance}")
-        return self.dbus_instance
-    
     def initialize_dbus(self, service_type: str):
         """Initialize D-Bus service for this device
         
@@ -276,8 +202,8 @@ class OrionTRDevice:
         """
         self.service_type = service_type
         
-        # Get the device instance (from settings or find available)
-        self.dbus_instance = self._get_device_instance(service_type)
+        # Use the instance from config file directly - no settings service needed
+        # since Orion-TR requires a config file with encryption keys anyway
         
         # Convert MAC address to base36 for compact service naming
         # MAC address is 6 bytes (48 bits) - convert to integer then base36
@@ -335,52 +261,7 @@ class OrionTRDevice:
         # Register the service after adding all paths
         self.dbus_service.register()
         
-        # Register device in settings for GUI device list
-        self._register_device_settings()
-        
         logger.info(f"{self.name}: D-Bus service initialized")
-    
-    def _register_device_settings(self):
-        """Register device in com.victronenergy.settings for GUI device list"""
-        try:
-            # Use same base36 MAC identifier as service name for consistency
-            mac_hex = self.mac.replace(':', '')
-            mac_int = int(mac_hex, 16)
-            mac_b36 = self._to_base36(mac_int)
-            unique_id = f"tr_{mac_b36}"
-            settings_path = f"/Settings/Devices/{unique_id}"
-            
-            # Create ClassAndVrmInstance setting
-            # Use the current service type (dcdc or alternator)
-            class_and_vrm_instance = f"{self.service_type}:{self.dbus_instance}"
-            
-            # Use SettingsDevice to register the device
-            # This makes it appear in the GUI device list
-            settings = {
-                "ClassAndVrmInstance": [
-                    f"{settings_path}/ClassAndVrmInstance",
-                    class_and_vrm_instance,
-                    0,
-                    0,
-                ],
-            }
-            
-            # Get the D-Bus connection from our service
-            bus = self.dbus_service._dbusconn
-            
-            # Initialize SettingsDevice (will create the settings if they don't exist)
-            self.settings_device = SettingsDevice(
-                bus,
-                settings,
-                eventCallback=None,  # No callback needed for now
-                timeout=10
-            )
-            
-            logger.info(f"{self.name}: Registered device settings: {settings_path}/ClassAndVrmInstance = {class_and_vrm_instance}")
-            
-        except Exception as e:
-            logger.error(f"{self.name}: Failed to register device settings: {e}")
-            # Don't fail the whole service if settings registration fails
     
     @staticmethod
     def _to_base36(num: int) -> str:
@@ -430,10 +311,24 @@ class OrionTRDevice:
             self.model_name = parsed.get_model_name()
             self.last_update = datetime.now()
             
-            logger.info(
-                f"{self.name}: IN={self.input_voltage}V OUT={self.output_voltage}V "
-                f"STATE={self.charge_state} ERR={self.charger_error} PID=0x{self.product_id:04X}"
-            )
+            # Throttled logging - only log on state changes or every 10 minutes
+            current_state = f"{self.input_voltage:.1f}V_{self.output_voltage:.1f}V_{self.charge_state}_{self.charger_error}"
+            should_log = False
+            
+            if self._last_logged_state != current_state:
+                # State changed
+                should_log = True
+                self._last_logged_state = current_state
+            elif self._last_log_time is None or (datetime.now() - self._last_log_time) >= self._log_interval:
+                # 10 minutes since last log
+                should_log = True
+            
+            if should_log:
+                self._last_log_time = datetime.now()
+                logger.info(
+                    f"{self.name}: IN={self.input_voltage}V OUT={self.output_voltage}V "
+                    f"STATE={self.charge_state} ERR={self.charger_error} PID=0x{self.product_id:04X}"
+                )
             
             # Determine what service type we should be using based on operation mode
             needed_service_type = self._determine_service_type(self.charge_state)
@@ -448,7 +343,6 @@ class OrionTRDevice:
                     except:
                         pass
                     self.dbus_service = None
-                    self.settings_device = None
                 
                 # Initialize with new service type
                 self.initialize_dbus(needed_service_type)
