@@ -126,18 +126,22 @@ class DBusAdvertisementScanner(BLEScanner):
             bus_name = dbus.service.BusName(f'com.victronenergy.{self.service_name}', self.bus)
             
             # Register for manufacturer IDs with optional product ID filtering
+            # Path formats (flat, no nesting):
+            # - /ble_advertisements/{service}/mfgr/{mfgr_id} - all devices from manufacturer
+            # - /ble_advertisements/{service}/mfgr_product/{mfgr_id}_{product_id} - specific product
+            # - /ble_advertisements/{service}/mfgr_product_range/{mfgr_id}_{low_pid}_{high_pid} - product range
             for mfg_id in self.manufacturer_ids:
                 # If product ID range is specified, register for the range
                 if self.product_id_range:
                     min_pid, max_pid = self.product_id_range
-                    path = f'/ble_advertisements/{self.service_name}/mfgr/{mfg_id}/pid_range/{min_pid}_{max_pid}'
+                    path = f'/ble_advertisements/{self.service_name}/mfgr_product_range/{mfg_id}_{min_pid}_{max_pid}'
                     obj = dbus.service.Object(bus_name, path)
                     self.registration_objects.append(obj)
                     logger.info(f"  Registered interest in mfg 0x{mfg_id:04X} with pid_range {min_pid}-{max_pid} (0x{min_pid:04X}-0x{max_pid:04X}) at {path}")
                 # If specific product IDs are specified, register for each
                 elif self.product_ids:
                     for pid in self.product_ids:
-                        path = f'/ble_advertisements/{self.service_name}/mfgr/{mfg_id}/pid/{pid}'
+                        path = f'/ble_advertisements/{self.service_name}/mfgr_product/{mfg_id}_{pid}'
                         obj = dbus.service.Object(bus_name, path)
                         self.registration_objects.append(obj)
                         logger.info(f"  Registered interest in mfg 0x{mfg_id:04X} pid 0x{pid:04X} at {path}")
