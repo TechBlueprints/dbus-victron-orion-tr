@@ -154,10 +154,10 @@ class OrionTRDevice:
         # Service type determination (set after first advertisement)
         self.service_type: Optional[str] = None  # 'dcdc' or 'alternator'
         
-        # Logging throttle - only log on changes or every 10 minutes
+        # Logging throttle - only log on changes or every hour
         self._last_log_time: Optional[datetime] = None
         self._last_logged_state: Optional[str] = None
-        self._log_interval = timedelta(minutes=10)
+        self._log_interval = timedelta(hours=1)
         
     @property
     def name(self) -> str:
