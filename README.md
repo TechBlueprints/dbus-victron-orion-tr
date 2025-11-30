@@ -112,12 +112,13 @@ nano config.ini
 [DEVICE_1]
 MAC = xx:xx:xx:xx:xx:xx
 KEY = your_32_character_hex_encryption_key
-INSTANCE = 1
+# Start at 130+ to avoid conflicts with built-in Venus OS services
+INSTANCE = 130
 
 [DEVICE_2]
 MAC = yy:yy:yy:yy:yy:yy
 KEY = another_32_character_hex_key
-INSTANCE = 2
+INSTANCE = 131
 ```
 
 **Note:** Device names are automatically read from the Bluetooth device itself.
